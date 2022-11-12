@@ -61,4 +61,35 @@ app.get('/participants', async (req, res) => {
     }
 });
 
+app.post('/messages', async (req, res) => {
+    try {
+        const { to, text, type } = req.body;
+        const hh = (new Date).getUTCHours();
+        const mm = (new Date).getUTCMinutes();
+        const ss = (new Date).getUTCSeconds();
+        
+        const mensagem = await db.collection("mensagens").insertOne({
+                to,
+                text,
+                type,
+                from: req.headers.user,
+                time: `${hh-3}:${mm}:${ss}`
+        })
+    
+        res.sendStatus(201);
+    } catch (error) {
+        res.status(422).send("Dados inválidos");
+    }
+})
+
+app.get('/messages', async (req, res) => {
+    try {
+        const mensagens = await db.collection("mensagens").find().toArray();
+        res.send(mensagens);
+    } catch (error){
+        console.log(error);
+        res.sendStatus(500);
+    }
+});
+
 app.listen(5000);
