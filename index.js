@@ -5,13 +5,17 @@ import dotenv from 'dotenv';
 import joi from 'joi';
 import dayjs from "dayjs";
 
-/* const userSchema = joi.object({
-    name: joi.string().required(),
-    to: joi.string().required(),
-    text: joi.string().required(),
-    //type: joi.string().required(),
-    //lastStatus: joi.number().required()
-  }); */
+const userSchema = joi.object({
+    name: joi.string().min(1).required(),
+});
+
+const messageSchema = joi.object({
+    from: joi.string().required().min(1), 
+    to: joi.string().required().min(1), 
+    text: joi.string().required().min(1), 
+    type: joi.string().valid('message').valid('private_message').required(), 
+    time: joi.string().required()
+});
 
 dotenv.config();
 const app = express();
@@ -31,18 +35,37 @@ app.post('/participants', async (req, res) => {
     if(await db.collection("participantes").findOne({name: `${req.body.name}`})) {
         return res.status(409).send("Usuário já existente");
     }   
+
+    let hh = (new Date).getUTCHours();
+    const mm = (new Date).getUTCMinutes();
+    const ss = (new Date).getUTCSeconds();
+
+    if(hh<=0)
+        hh=hh+3;
+
     try {
-        const participante = await db.collection("participantes").insertOne({
-            name: `${req.body.name}`, 
+        const participante = req.body;
+        const validation = userSchema.validate(participante, { abortEarly: false });
+        console.log(validation);
+        if(validation.error){
+            const erros = validation.error.details;
+            const errosTXT = erros.map(erro => erro.message);
+            return res.status(422).send(errosTXT);
+        }       
+        
+        const { name } = req.body;
+        await db.collection("participantes").insertOne({
+            name: name, 
             lastStatus: Date.now()
-        });       
-        const mensagem = {
-            from: 'xxx', 
+        });   
+        await db.collection("mensagens").insertOne({
+            from: name, 
             to: 'Todos', 
             text: 'entra na sala...', 
-            type: 'status', 
-            time: 'HH:MM:SS',
-        }       
+            type: "message", 
+            time: `${hh-3}:${mm}:${ss}`
+        });      
+
         return res.sendStatus(201);
     } catch(err) {
         return res.status(422).send("Dados inválidos");
@@ -66,11 +89,14 @@ app.post('/messages', async (req, res) => {
         const mm = (new Date).getUTCMinutes();
         const ss = (new Date).getUTCSeconds();
         
+        if(!(await db.collection("participantes").findOne({name: req.headers.user})))
+            return sendStatus(422);
+
         const mensagem = await db.collection("mensagens").insertOne({
                 to,
                 text,
                 type,
-                from: req.headers.user,
+                from: `${req.headers.user}`,
                 time: `${hh-3}:${mm}:${ss}`
         })
     
