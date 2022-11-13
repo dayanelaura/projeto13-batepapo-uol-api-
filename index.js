@@ -10,11 +10,9 @@ const userSchema = joi.object({
 });
 
 const messageSchema = joi.object({
-    from: joi.string().required().min(1), 
     to: joi.string().required().min(1), 
     text: joi.string().required().min(1), 
-    type: joi.string().valid('message').valid('private_message').required(), 
-    time: joi.string().required()
+    type: joi.string().valid('message').valid('private_message').required()
 });
 
 dotenv.config();
@@ -84,15 +82,29 @@ app.get('/participants', async (req, res) => {
 
 app.post('/messages', async (req, res) => {
     try {
-        const { to, text, type } = req.body;
+        if(!(await db.collection("participantes").findOne({name: req.headers.user})))
+            return res.status(422).send("Usuário não cadastrado");
+        if(!(await db.collection("participantes").findOne({name: req.body.to})))
+            return res.status(422).send("Destinatário não encontrado na lista de participantes");
+
         const hh = (new Date).getUTCHours();
         const mm = (new Date).getUTCMinutes();
         const ss = (new Date).getUTCSeconds();
-        
-        if(!(await db.collection("participantes").findOne({name: req.headers.user})))
-            return sendStatus(422);
+    
+        if(hh<=0)
+            hh=hh+3;
 
-        const mensagem = await db.collection("mensagens").insertOne({
+        const mensagem = req.body;
+        const validation = messageSchema.validate(mensagem, { abortEarly: false });
+        console.log(validation);
+        if(validation.error){
+            const erros = validation.error.details;
+            const errosTXT = erros.map(erro => erro.message);
+            return res.status(422).send(errosTXT);
+        }    
+
+        const { to, text, type } = req.body;
+        await db.collection("mensagens").insertOne({
                 to,
                 text,
                 type,
