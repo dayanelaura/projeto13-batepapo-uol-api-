@@ -96,7 +96,6 @@ app.post('/messages', async (req, res) => {
 
         const mensagem = req.body;
         const validation = messageSchema.validate(mensagem, { abortEarly: false });
-        console.log(validation);
         if(validation.error){
             const erros = validation.error.details;
             const errosTXT = erros.map(erro => erro.message);
@@ -136,6 +135,25 @@ app.get('/messages', async (req, res) => {
     } catch (error){
         console.log(error);
         res.sendStatus(500);
+    }
+});
+
+app.post('/status', async (req, res) => {
+    try {
+        const partCollection = await db.collection("participantes");
+        const usuario = await partCollection.findOne({name: req.headers.user});
+        
+        if(!usuario)
+            return res.sendStatus(404);
+        
+        await partCollection.updateOne({ 
+			name: req.headers.user 
+            }, { $set: { lastStatus: Date.now() } }
+        );
+
+        res.sendStatus(200);
+    } catch (error){
+        res.sendStatus(404);
     }
 });
 
