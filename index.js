@@ -19,9 +19,7 @@ app.use(cors());
 app.use(express.json());
   
 const mongoClient = new MongoClient(process.env.MONGO_URI);
-
 let db;
-
 try {
     await mongoClient.connect();
     db = mongoClient.db("usuarios");
@@ -78,13 +76,24 @@ app.post('/messages', async (req, res) => {
     
         res.sendStatus(201);
     } catch (error) {
-        res.status(422).send("Dados inválidos");
+        res.sendStatus(422);
     }
 })
 
 app.get('/messages', async (req, res) => {
     try {
-        const mensagens = await db.collection("mensagens").find().toArray();
+        const mensagensAll = await db.collection("mensagens").find().toArray();
+
+        const mensagens = await mensagensAll.filter((mensagem) =>
+                (mensagem.to === req.headers.user || mensagem.from === req.headers.user || mensagem.type === "message")
+        );
+        
+        const tamanho = mensagens.length;
+        if(req.query.limit){
+            const limite = Number(req.query.limit);
+            const ultimasMensagens = mensagens.filter((mensagem, index) => (index >= tamanho-limite));
+            return res.send(ultimasMensagens);
+        }
         res.send(mensagens);
     } catch (error){
         console.log(error);
