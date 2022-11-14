@@ -157,4 +157,35 @@ app.post('/status', async (req, res) => {
     }
 });
 
+async function monitorarStatus(){   
+    const tempoMax = Date.now() - 10000;
+    try{
+        const partic_Array = await db.collection("participantes").find().toArray();
+        const inativos = partic_Array.filter((usuario) => usuario.lastStatus < tempoMax);
+        if(!inativos)
+            return;
+        
+        const HH = (new Date).getUTCHours();
+        const MM = (new Date).getUTCMinutes();
+        const SS = (new Date).getUTCSeconds();
+    
+        if(HH<=0)
+            HH=HH+3;
+
+        inativos.forEach((participante) => {
+            db.collection("participantes").deleteOne({ name: participante.name });
+            db.collection("mensagens").insertOne({
+                from: participante.name, 
+                to: 'Todos', 
+                text: 'sai da sala...', 
+                type: 'message', 
+                time: `${HH-3}:${MM}:${SS}`
+            });
+        });
+    }catch(error) {
+        console.log(error);
+    }
+}
+setInterval(monitorarStatus, 15000);
+
 app.listen(5000);
