@@ -30,16 +30,12 @@ try {
 }
 
 app.post('/participants', async (req, res) => {
-    if(await db.collection("participantes").findOne({name: `${req.body.name.toLowerCase()}`})) {
+    if(await db.collection("participantes").findOne({ name: req.body.name.toLowerCase() })){
         return res.status(409).send("Usuário já existente");
     }   
 
-    let hh = (new Date).getUTCHours();
-    const mm = (new Date).getUTCMinutes();
-    const ss = (new Date).getUTCSeconds();
-
-    if(hh<=0)
-        hh=hh+3;
+    const dia = dayjs().format();
+    const hora = dia.slice(11,19); 
 
     try {
         const participante = req.body;
@@ -60,7 +56,7 @@ app.post('/participants', async (req, res) => {
             to: 'Todos', 
             text: 'entra na sala...', 
             type: "message", 
-            time: `${hh-3}:${mm}:${ss}`
+            time: hora
         });      
 
         return res.sendStatus(201);
@@ -84,14 +80,10 @@ app.post('/messages', async (req, res) => {
         if(!(await db.collection("participantes").findOne({name: req.headers.user.toLowerCase()})))
             return res.status(422).send("Usuário não cadastrado");
         if(!(await db.collection("participantes").findOne({name: req.body.to.toLowerCase()})))
-            return res.status(422).send("Destinatário não encontrado na lista de participantes");
+            return res.status(422).send("Destinatário não localizado na lista de participantes");
 
-        const hh = (new Date).getUTCHours();
-        const mm = (new Date).getUTCMinutes();
-        const ss = (new Date).getUTCSeconds();
-    
-        if(hh<=0)
-            hh=hh+3;
+        const dia = dayjs().format();
+        const hora = dia.slice(11,19); 
 
         const mensagem = req.body;
         const validation = messageSchema.validate(mensagem, { abortEarly: false });
@@ -103,13 +95,13 @@ app.post('/messages', async (req, res) => {
 
         const { to, text, type } = req.body;
         await db.collection("mensagens").insertOne({
-                to: `${to.toLowerCase()}`,
-                text,
-                type,
-                from: `${req.headers.user.toLowerCase()}`,
-                time: `${hh-3}:${mm}:${ss}`
-        })
-    
+                to: to.toLowerCase(),
+                text: text,
+                type: type,
+                from: req.headers.user.toLowerCase(),
+                time: hora
+        });
+
         res.sendStatus(201);
     } catch (error) {
         res.sendStatus(422);
@@ -157,19 +149,17 @@ app.post('/status', async (req, res) => {
 });
 
 async function monitorarStatus(){   
+
     const tempoMax = Date.now() - 10000;
     try{
         const partic_Array = await db.collection("participantes").find().toArray();
         const inativos = partic_Array.filter((usuario) => usuario.lastStatus < tempoMax);
+    
         if(!inativos)
             return;
         
-        const HH = (new Date).getUTCHours();
-        const MM = (new Date).getUTCMinutes();
-        const SS = (new Date).getUTCSeconds();
-    
-        if(HH<=0)
-            HH=HH+3;
+        const dia = dayjs().format();
+        const hora = dia.slice(11,19); 
 
         inativos.forEach((participante) => {
             db.collection("participantes").deleteOne({ name: participante.name });
@@ -178,13 +168,13 @@ async function monitorarStatus(){
                 to: 'Todos', 
                 text: 'sai da sala...', 
                 type: 'message', 
-                time: `${HH-3}:${MM}:${SS}`
+                time: hora
             });
         });
-    }catch(error) {
+    } catch(error){
         console.log(error);
     }
 }
-setInterval(monitorarStatus, 15000);
+//setInterval(monitorarStatus, 15000);
 
 app.listen(5000);
