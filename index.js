@@ -30,7 +30,7 @@ try {
 }
 
 app.post('/participants', async (req, res) => {
-    if(await db.collection("participantes").findOne({name: `${req.body.name}`})) {
+    if(await db.collection("participantes").findOne({name: `${req.body.name.toLowerCase()}`})) {
         return res.status(409).send("Usuário já existente");
     }   
 
@@ -44,7 +44,6 @@ app.post('/participants', async (req, res) => {
     try {
         const participante = req.body;
         const validation = userSchema.validate(participante, { abortEarly: false });
-        console.log(validation);
         if(validation.error){
             const erros = validation.error.details;
             const errosTXT = erros.map(erro => erro.message);
@@ -53,11 +52,11 @@ app.post('/participants', async (req, res) => {
         
         const { name } = req.body;
         await db.collection("participantes").insertOne({
-            name: name, 
+            name: name.toLowerCase(), 
             lastStatus: Date.now()
         });   
         await db.collection("mensagens").insertOne({
-            from: name, 
+            from: name.toLowerCase(), 
             to: 'Todos', 
             text: 'entra na sala...', 
             type: "message", 
@@ -82,9 +81,9 @@ app.get('/participants', async (req, res) => {
 
 app.post('/messages', async (req, res) => {
     try {
-        if(!(await db.collection("participantes").findOne({name: req.headers.user})))
+        if(!(await db.collection("participantes").findOne({name: req.headers.user.toLowerCase()})))
             return res.status(422).send("Usuário não cadastrado");
-        if(!(await db.collection("participantes").findOne({name: req.body.to})))
+        if(!(await db.collection("participantes").findOne({name: req.body.to.toLowerCase()})))
             return res.status(422).send("Destinatário não encontrado na lista de participantes");
 
         const hh = (new Date).getUTCHours();
@@ -104,10 +103,10 @@ app.post('/messages', async (req, res) => {
 
         const { to, text, type } = req.body;
         await db.collection("mensagens").insertOne({
-                to,
+                to: `${to.toLowerCase()}`,
                 text,
                 type,
-                from: `${req.headers.user}`,
+                from: `${req.headers.user.toLowerCase()}`,
                 time: `${hh-3}:${mm}:${ss}`
         })
     
@@ -122,7 +121,7 @@ app.get('/messages', async (req, res) => {
         const mensagensAll = await db.collection("mensagens").find().toArray();
 
         const mensagens = await mensagensAll.filter((mensagem) =>
-                (mensagem.to === req.headers.user || mensagem.from === req.headers.user || mensagem.type === "message")
+                (mensagem.to === req.headers.user.toLowerCase() || mensagem.from === req.headers.user.toLowerCase() || mensagem.type === "message")
         );
         
         const tamanho = mensagens.length;
@@ -141,13 +140,13 @@ app.get('/messages', async (req, res) => {
 app.post('/status', async (req, res) => {
     try {
         const partCollection = await db.collection("participantes");
-        const usuario = await partCollection.findOne({name: req.headers.user});
+        const usuario = await partCollection.findOne({name: req.headers.user.toLowerCase()});
         
         if(!usuario)
             return res.sendStatus(404);
         
         await partCollection.updateOne({ 
-			name: req.headers.user 
+			name: req.headers.user.toLowerCase() 
             }, { $set: { lastStatus: Date.now() } }
         );
 
