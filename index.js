@@ -30,9 +30,11 @@ try {
 }
 
 app.post('/participants', async (req, res) => {
-    if(await db.collection("participantes").findOne({ name: req.body.name.toLowerCase() })){
+    const partic_array = await db.collection("participantes").find().toArray();
+    const existente = partic_array.find( value => value.name.toLowerCase() === req.body.name.toLowerCase() );
+
+    if(existente!==undefined)
         return res.status(409).send("Usuário já existente");
-    }   
 
     const dia = dayjs().format();
     const hora = dia.slice(11,19); 
@@ -48,11 +50,11 @@ app.post('/participants', async (req, res) => {
         
         const { name } = req.body;
         await db.collection("participantes").insertOne({
-            name: name.toLowerCase(), 
+            name: name, 
             lastStatus: Date.now()
         });   
         await db.collection("mensagens").insertOne({
-            from: name.toLowerCase(), 
+            from: name, 
             to: 'Todos', 
             text: 'entra na sala...', 
             type: "message", 
@@ -76,11 +78,10 @@ app.get('/participants', async (req, res) => {
 });
 
 app.post('/messages', async (req, res) => {
+
     try {
-        if(!(await db.collection("participantes").findOne({name: req.headers.user.toLowerCase()})))
+        if(!(await db.collection("participantes").findOne({name: req.headers.user})))
             return res.status(422).send("Usuário não cadastrado");
-        if(!(await db.collection("participantes").findOne({name: req.body.to.toLowerCase()})))
-            return res.status(422).send("Destinatário não localizado na lista de participantes");
 
         const dia = dayjs().format();
         const hora = dia.slice(11,19); 
@@ -95,10 +96,10 @@ app.post('/messages', async (req, res) => {
 
         const { to, text, type } = req.body;
         await db.collection("mensagens").insertOne({
-                to: to.toLowerCase(),
+                to: to,
                 text: text,
                 type: type,
-                from: req.headers.user.toLowerCase(),
+                from: req.headers.user,
                 time: hora
         });
 
@@ -113,7 +114,7 @@ app.get('/messages', async (req, res) => {
         const mensagensAll = await db.collection("mensagens").find().toArray();
 
         const mensagens = await mensagensAll.filter((mensagem) =>
-                (mensagem.to === req.headers.user.toLowerCase() || mensagem.from === req.headers.user.toLowerCase() || mensagem.type === "message")
+                (mensagem.to === req.headers.user || mensagem.from === req.headers.user || mensagem.type === "message" || mensagem.to === 'Todos')
         );
         
         const tamanho = mensagens.length;
@@ -132,13 +133,13 @@ app.get('/messages', async (req, res) => {
 app.post('/status', async (req, res) => {
     try {
         const partCollection = await db.collection("participantes");
-        const usuario = await partCollection.findOne({name: req.headers.user.toLowerCase()});
+        const usuario = await partCollection.findOne({name: req.headers.user});
         
         if(!usuario)
             return res.sendStatus(404);
         
         await partCollection.updateOne({ 
-			name: req.headers.user.toLowerCase() 
+			name: req.headers.user 
             }, { $set: { lastStatus: Date.now() } }
         );
 
@@ -175,6 +176,6 @@ async function monitorarStatus(){
         console.log(error);
     }
 }
-//setInterval(monitorarStatus, 15000);
+setInterval(monitorarStatus, 15000);
 
 app.listen(5000);
